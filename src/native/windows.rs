@@ -858,7 +858,7 @@ where
         };
         // well, technically this is UB and we are suppose to use *mut WindowPayload instead of &mut WindowPayload forever from now on...
         // so if there going to be some weird bugs someday in the future - check this out!
-        SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
+        SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut p as *mut _ as _);
 
         let mut done = false;
         while !(done || p.display.display_data.quit_ordered) {

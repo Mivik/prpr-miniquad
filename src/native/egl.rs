@@ -305,16 +305,19 @@ pub unsafe fn create_egl_context(
         let mut b: i32 = 0;
         let mut a: i32 = 0;
         let mut d: i32 = 0;
+        let mut s: i32 = 0;
         if (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_RED_SIZE as _, &mut r) == 1
             && (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_GREEN_SIZE as _, &mut g) == 1
             && (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_BLUE_SIZE as _, &mut b) == 1
             && (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_ALPHA_SIZE as _, &mut a) == 1
             && (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_DEPTH_SIZE as _, &mut d) == 1
-            && r == 8
-            && g == 8
-            && b == 8
+            && (egl.eglGetConfigAttrib.unwrap())(display, *c, EGL_STENCIL_SIZE as _, &mut s) == 1
+            // && r == 5
+            // && g == 6
+            // && b == 5
             && (alpha_size == 0 || a == alpha_size as _)
-            && d == 16
+            // && d == 16
+            && s == 8
         {
             exact_cfg_found = true;
             config = *c;

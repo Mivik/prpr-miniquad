@@ -401,7 +401,7 @@ unsafe fn choose_fbconfig(
     screen: i32,
     multisample: bool,
 ) -> GLXFBConfig {
-    let desired_sample_count = 0;
+    let desired_sample_count = 4;
 
     let native_configs: *mut GLXFBConfig;
     let closest: *const GLFBConfig;

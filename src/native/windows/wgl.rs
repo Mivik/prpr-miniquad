@@ -388,12 +388,13 @@ impl Wgl {
         if SetPixelFormat(display.dc, pixel_format as _, &pfd) == 0 {
             panic!("WGL: Failed to set selected pixel format!");
         }
-        if !self.arb_create_context {
-            panic!("WGL: ARB_create_context required!\n");
-        }
-        if !self.arb_create_context_profile {
-            panic!("WGL: ARB_create_context_profile required!");
-        }
+
+        // if !self.arb_create_context {
+        //     panic!("WGL: ARB_create_context required!\n");
+        // }
+        // if !self.arb_create_context_profile {
+        //     panic!("WGL: ARB_create_context_profile required!");
+        // }
 
         // CreateContextAttribsARB is supposed to create the context with
         // the highest version version possible

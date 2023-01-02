@@ -101,7 +101,23 @@ impl NativeDisplay for AndroidDisplay {
     fn high_dpi(&self) -> bool {
         true
     }
-    fn order_quit(&mut self) {}
+    fn order_quit(&mut self) {
+        unsafe {
+            let env = attach_jni_env();
+
+            let get_method_id = (**env).GetMethodID.unwrap();
+            let get_object_class = (**env).GetObjectClass.unwrap();
+            let call_void_method = (**env).CallVoidMethod.unwrap();
+
+            let mid = (get_method_id)(
+                env,
+                get_object_class(env, ACTIVITY),
+                b"finish\0".as_ptr() as _,
+                b"()V\0".as_ptr() as _,
+            );
+            (call_void_method)(env, ACTIVITY, mid);
+        }
+    }
     fn request_quit(&mut self) {}
     fn cancel_quit(&mut self) {}
     fn set_cursor_grab(&mut self, _grab: bool) {}
@@ -486,6 +502,25 @@ unsafe fn create_native_window(surface: ndk_sys::jobject) -> *mut ndk_sys::ANati
     let env = attach_jni_env();
 
     ndk_sys::ANativeWindow_fromSurface(env, surface)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_initializeContext(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    activity: ndk_sys::jobject,
+) {
+    let env = attach_jni_env();
+    let activity = (**env).NewGlobalRef.unwrap()(env, activity);
+    ndk_context::initialize_android_context(std::mem::transmute(VM), activity as _);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_releaseContext(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+) {
+    ndk_context::release_android_context();
 }
 
 #[no_mangle]

@@ -64,7 +64,7 @@ impl NativeDisplay for WasmDisplay {
         self.clipboard.clone()
     }
     fn clipboard_set(&mut self, data: &str) {
-        clipboard_set(data)
+        self.clipboard = Some(data.to_owned());
     }
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
