@@ -570,6 +570,16 @@ struct RenderPassInternal {
 }
 
 impl RenderPass {
+    pub fn from_raw(ctx: &mut Context, gl_fb: GLuint, dummy_texture: Texture) -> Self {
+        let pass = RenderPassInternal {
+            gl_fb,
+            texture: dummy_texture,
+            depth_texture: None,
+        };
+        ctx.passes.push(pass);
+        Self(ctx.passes.len() - 1)
+    }
+
     pub fn new(
         ctx: &mut Context,
         color_img: Texture,
@@ -609,6 +619,12 @@ impl RenderPass {
         ctx.passes.push(pass);
 
         RenderPass(ctx.passes.len() - 1)
+    }
+
+    pub fn gl_internal_id(&self, ctx: &mut Context) -> GLuint {
+        let render_pass = &mut ctx.passes[self.0];
+
+        render_pass.gl_fb
     }
 
     pub fn texture(&self, ctx: &mut Context) -> Texture {
