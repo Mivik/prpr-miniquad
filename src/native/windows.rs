@@ -7,14 +7,13 @@ use crate::{
 
 use winapi::{
     shared::{
-        hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
-        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
-        ntdef::NULL,
-        windef::{HCURSOR, HDC, HICON, HWND, POINT, RECT},
+        minwindef::{DWORD, HINSTANCE, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
+        ntdef::{HRESULT, NULL},
+        windef::{HCURSOR, HDC, HICON, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
-        libloaderapi::{GetModuleHandleW, GetProcAddress},
+        libloaderapi::{FreeLibrary, GetModuleHandleW, GetProcAddress, LoadLibraryA},
         shellscalingapi::*,
         wingdi::*,
         winuser::*,
@@ -38,7 +37,6 @@ pub(crate) struct Display {
     content_scale: f32,
     window_scale: f32,
     mouse_scale: f32,
-    show_cursor: bool,
     user_cursor: bool,
     mouse_x: f32,
     mouse_y: f32,
@@ -73,22 +71,8 @@ impl crate::native::NativeDisplay for Display {
         self.display_data.quit_requested = false;
     }
 
-    fn set_cursor_grab(&mut self, grab: bool) {
-        self.cursor_grabbed = grab;
-        unsafe {
-            if grab {
-                update_clip_rect(self.wnd);
-            } else {
-                ClipCursor(NULL as _);
-            }
-        }
-    }
-    fn show_mouse(&mut self, shown: bool) {
-        if self.show_cursor != shown {
-            self.show_cursor = shown;
-            unsafe { ShowCursor(shown.into()) };
-        }
-    }
+    fn set_cursor_grab(&mut self, _grab: bool) {}
+    fn show_mouse(&mut self, _shown: bool) {}
     fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
         let cursor_name = match cursor_icon {
             CursorIcon::Default => IDC_ARROW,
@@ -333,10 +317,12 @@ unsafe extern "system" fn win32_wndproc(
             }
         }
         WM_SETCURSOR => {
-            if display.user_cursor && LOWORD(lparam as _) == HTCLIENT as _ {
-                SetCursor(display.cursor);
+            if display.user_cursor {
+                if LOWORD(lparam as _) == HTCLIENT as _ {
+                    SetCursor(display.cursor);
 
-                return 1;
+                    return 1;
+                }
             }
         }
         WM_LBUTTONDOWN => {
@@ -451,6 +437,8 @@ unsafe extern "system" fn win32_wndproc(
             let dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
             let dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
             event_handler.raw_mouse_motion(context.with_display(display), dx as f32, dy as f32);
+
+            update_clip_rect(hwnd);
         }
 
         WM_MOUSELEAVE => {
@@ -662,21 +650,6 @@ unsafe fn create_window(
         NULL as _,                   // lparam
     );
     assert!(hwnd.is_null() == false);
-
-    let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
-    rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
-    rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
-    rawinputdevice.hwndTarget = NULL as _;
-    let register_succeed = RegisterRawInputDevices(
-        &rawinputdevice as *const _,
-        1,
-        std::mem::size_of::<RAWINPUTDEVICE>() as _,
-    );
-    assert!(
-        register_succeed == 1,
-        "Win32: failed to register for raw mouse input!"
-    );
-
     ShowWindow(hwnd, SW_SHOW);
     let dc = GetDC(hwnd);
     assert!(dc.is_null() == false);
@@ -762,24 +735,73 @@ impl Display {
     }
 
     unsafe fn init_dpi(&mut self, high_dpi: bool) {
-        if high_dpi {
+        unsafe fn get_proc_address<T>(lib: HINSTANCE, proc: &[u8]) -> Option<T> {
+            let proc = GetProcAddress(lib, proc.as_ptr() as *const _);
+
+            if proc.is_null() {
+                return None;
+            }
+            return Some(std::mem::transmute_copy(&proc));
+        }
+
+        let user32 = LoadLibraryA(b"user32.dll\0".as_ptr() as *const _);
+
+        let mut setprocessdpiaware: Option<extern "system" fn() -> bool> = None;
+        if user32.is_null() == false {
+            setprocessdpiaware = get_proc_address(user32, b"SetProcessDPIAware\0");
+        }
+
+        let shcore = LoadLibraryA(b"shcore.dll\0".as_ptr() as *const _);
+
+        let mut setprocessdpiawareness: Option<
+            extern "system" fn(_: PROCESS_DPI_AWARENESS) -> HRESULT,
+        > = None;
+        let mut getdpiformonitor: Option<
+            extern "system" fn(
+                _: HMONITOR,
+                _: MONITOR_DPI_TYPE,
+                _: *mut UINT,
+                _: *mut UINT,
+            ) -> HRESULT,
+        > = None;
+
+        if shcore.is_null() == false {
+            setprocessdpiawareness = get_proc_address(shcore, b"SetProcessDpiAwareness\0");
+            getdpiformonitor = get_proc_address(shcore, b"GetDpiForMonitor\0");
+        }
+
+        if let Some(setprocessdpiawareness) = setprocessdpiawareness {
+            // if the app didn't request HighDPI rendering, let Windows do the upscaling
+            let mut process_dpi_awareness = PROCESS_SYSTEM_DPI_AWARE;
+            self.dpi_aware = true;
+            if !high_dpi {
+                process_dpi_awareness = PROCESS_DPI_UNAWARE;
+                self.dpi_aware = false;
+            }
+            setprocessdpiawareness(process_dpi_awareness);
+        } else if let Some(setprocessdpiaware) = setprocessdpiaware {
+            setprocessdpiaware();
             self.dpi_aware = true;
         }
         // get dpi scale factor for main monitor
-        if self.dpi_aware {
-            let pt = POINT { x: 1, y: 1 };
-            let hm = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-            let mut dpix: UINT = 0;
-            let mut dpiy: UINT = 0;
-            let hr = GetDpiForMonitor(
-                hm,
-                MDT_EFFECTIVE_DPI,
-                &mut dpix as *mut _ as _,
-                &mut dpiy as *mut _ as _,
-            );
-            assert_eq!(hr, 0);
-            //  clamp window scale to an integer factor
-            self.window_scale = dpix as f32 / 96.0;
+        if let Some(getdpiformonitor) = getdpiformonitor {
+            if self.dpi_aware {
+                let pt = POINT { x: 1, y: 1 };
+                let hm = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+                let mut dpix: UINT = 0;
+                let mut dpiy: UINT = 0;
+                let hr = getdpiformonitor(
+                    hm,
+                    MDT_EFFECTIVE_DPI,
+                    &mut dpix as *mut _ as _,
+                    &mut dpiy as *mut _ as _,
+                );
+                assert_eq!(hr, 0);
+                //  clamp window scale to an integer factor
+                self.window_scale = dpix as f32 / 96.0;
+            }
+        } else {
+            self.window_scale = 1.0;
         }
         if high_dpi {
             self.content_scale = self.window_scale;
@@ -787,6 +809,12 @@ impl Display {
         } else {
             self.content_scale = 1.0;
             self.mouse_scale = 1.0 / self.window_scale;
+        }
+        if !user32.is_null() {
+            FreeLibrary(user32);
+        }
+        if !shcore.is_null() {
+            FreeLibrary(shcore);
         }
     }
 }
@@ -796,9 +824,6 @@ where
     F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
 {
     unsafe {
-        if conf.high_dpi {
-            SetProcessDPIAware();
-        }
         let (wnd, dc) = create_window(
             &conf.window_title,
             conf.fullscreen,
@@ -824,7 +849,6 @@ where
             window_scale: 1.,
             mouse_x: 0.,
             mouse_y: 0.,
-            show_cursor: true,
             user_cursor: false,
             cursor: std::ptr::null_mut(),
             display_data: Default::default(),
