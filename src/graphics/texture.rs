@@ -59,7 +59,7 @@ pub enum TextureFormat {
 
 impl TextureFormat {
     /// Converts from TextureFormat to (internal_format, format, pixel_type)
-    fn into_gl_params(self, alpha_texture: bool) -> (GLenum, GLenum, GLenum) {
+    pub fn into_gl_params(self, alpha_texture: bool) -> (GLenum, GLenum, GLenum) {
         match self {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),

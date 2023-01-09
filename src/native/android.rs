@@ -78,7 +78,7 @@ thread_local! {
 fn send_message(message: Message) {
     MESSAGES_TX.with(|tx| {
         let mut tx = tx.borrow_mut();
-        tx.as_mut().unwrap().send(message).unwrap();
+        let _ = tx.as_mut().unwrap().send(message);
     })
 }
 

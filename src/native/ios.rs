@@ -17,10 +17,14 @@ use {
         Context, GraphicsContext,
     },
     std::os::raw::c_void,
+    std::sync::Mutex,
 };
+
+pub static VIEW_CTRL_OBJ: Mutex<usize> = Mutex::new(0);
 
 struct IosDisplay {
     data: NativeDisplayData,
+    scale: f64,
 }
 
 impl crate::native::NativeDisplay for IosDisplay {
@@ -84,12 +88,13 @@ pub fn define_glk_view() -> *const Class {
     let superclass = class!(GLKView);
     let mut decl = ClassDecl::new("QuadView", superclass).unwrap();
 
-    extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+    use crate::event::TouchPhase;
+
+    fn process_event(this: &Object, touches: ObjcId, phase: TouchPhase) {
         unsafe {
             let payload = get_window_payload(this);
 
-            let enumerator: ObjcId = msg_send![event, allTouches];
-            let enumerator: ObjcId = msg_send![enumerator, objectEnumerator];
+            let enumerator: ObjcId = msg_send![touches, objectEnumerator];
 
             let mut ios_touch: ObjcId;
 
@@ -99,14 +104,13 @@ pub fn define_glk_view() -> *const Class {
             } {
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
-                if payload.display.data.high_dpi {
-                    ios_pos.x *= 2.;
-                    ios_pos.y *= 2.;
-                }
+                ios_pos.x *= payload.display.scale;
+                ios_pos.y *= payload.display.scale;
                 if let Some((context, event_handler)) = payload.context() {
-                    event_handler.mouse_button_down_event(
+                    event_handler.touch_event(
                         context,
-                        MouseButton::Left,
+                        phase,
+                        ios_touch as _,
                         ios_pos.x as _,
                         ios_pos.y as _,
                     );
@@ -115,11 +119,21 @@ pub fn define_glk_view() -> *const Class {
         }
     }
 
-    extern "C" fn touches_moved(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+    extern "C" fn touches_began(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
+        process_event(this, touches, TouchPhase::Started);
+    }
 
-    extern "C" fn touches_ended(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+    extern "C" fn touches_moved(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
+        process_event(this, touches, TouchPhase::Moved);
+    }
 
-    extern "C" fn touches_canceled(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+    extern "C" fn touches_ended(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
+        process_event(this, touches, TouchPhase::Ended);
+    }
+
+    extern "C" fn touches_cancelled(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
+        process_event(this, touches, TouchPhase::Cancelled);
+    }
 
     unsafe {
         decl.add_method(sel!(isOpaque), yes as extern "C" fn(&Object, Sel) -> BOOL);
@@ -136,8 +150,8 @@ pub fn define_glk_view() -> *const Class {
             touches_ended as extern "C" fn(&Object, Sel, ObjcId, ObjcId),
         );
         decl.add_method(
-            sel!(touchesCanceled: withEvent:),
-            touches_canceled as extern "C" fn(&Object, Sel, ObjcId, ObjcId),
+            sel!(touchesCancelled: withEvent:),
+            touches_cancelled as extern "C" fn(&Object, Sel, ObjcId, ObjcId),
         );
     }
 
@@ -163,17 +177,10 @@ pub fn define_glk_view_dlg() -> *const Class {
 
         let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
         let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
-        let (screen_width, screen_height) = if payload.display.data.high_dpi {
-            (
-                screen_rect.size.width as i32 * 2,
-                screen_rect.size.height as i32 * 2,
-            )
-        } else {
-            (
-                screen_rect.size.width as i32,
-                screen_rect.size.height as i32,
-            )
-        };
+        let (screen_width, screen_height) = (
+            (screen_rect.size.width * payload.display.scale) as i32,
+            (screen_rect.size.height * payload.display.scale) as i32,
+        );
 
         if payload.display.data.screen_width != screen_width
             || payload.display.data.screen_height != screen_height
@@ -216,18 +223,16 @@ pub fn define_app_delegate() -> *const Class {
 
             let main_screen: ObjcId = msg_send![class!(UIScreen), mainScreen];
             let screen_rect: NSRect = msg_send![main_screen, bounds];
+            let mut screen_scale: f64 = msg_send![main_screen, scale];
 
-            let (screen_width, screen_height) = if conf.high_dpi {
-                (
-                    screen_rect.size.width as i32 * 2,
-                    screen_rect.size.height as i32 * 2,
-                )
-            } else {
-                (
-                    screen_rect.size.width as i32,
-                    screen_rect.size.height as i32,
-                )
-            };
+            if conf.high_dpi {
+                screen_scale *= 2.;
+            }
+
+            let (screen_width, screen_height) = (
+                (screen_rect.size.width * screen_scale) as i32,
+                (screen_rect.size.height * screen_scale) as i32,
+            );
 
             let window_obj: ObjcId = msg_send![class!(UIWindow), alloc];
             let window_obj: ObjcId = msg_send![window_obj, initWithFrame: screen_rect];
@@ -248,6 +253,7 @@ pub fn define_app_delegate() -> *const Class {
                         high_dpi: conf.high_dpi,
                         ..Default::default()
                     },
+                    scale: screen_scale,
                 },
                 f: Some(Box::new(f)),
                 event_handler: None,
@@ -284,11 +290,7 @@ pub fn define_app_delegate() -> *const Class {
             let _: () = msg_send![glk_view_obj, setEnableSetNeedsDisplay: NO];
             let _: () = msg_send![glk_view_obj, setUserInteractionEnabled: YES];
             let _: () = msg_send![glk_view_obj, setMultipleTouchEnabled: YES];
-            if conf.high_dpi {
-                let _: () = msg_send![glk_view_obj, setContentScaleFactor: 2.0];
-            } else {
-                let _: () = msg_send![glk_view_obj, setContentScaleFactor: 1.0];
-            }
+            let _: () = msg_send![glk_view_obj, setContentScaleFactor: screen_scale];
             let _: () = msg_send![window_obj, addSubview: glk_view_obj];
 
             let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
@@ -297,6 +299,8 @@ pub fn define_app_delegate() -> *const Class {
             let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
             let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:60];
             let _: () = msg_send![window_obj, setRootViewController: view_ctrl_obj];
+
+            *VIEW_CTRL_OBJ.lock().unwrap() = view_ctrl_obj as _;
 
             let _: () = msg_send![window_obj, makeKeyAndVisible];
         }
