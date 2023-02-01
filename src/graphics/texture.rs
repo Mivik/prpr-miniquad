@@ -22,12 +22,12 @@ impl Texture {
         self.texture
     }
 
-    pub unsafe fn from_raw_id(texture: GLuint) -> Self {
+    pub unsafe fn from_raw_id(texture: GLuint, format: TextureFormat) -> Self {
         Self {
             texture,
             width: 0,
             height: 0,
-            format: TextureFormat::RGBA8, // assumed for now
+            format,
         }
     }
 
