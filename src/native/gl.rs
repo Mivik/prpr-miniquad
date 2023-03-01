@@ -386,6 +386,7 @@ gl_loader!(
         width: GLsizei,
         height: GLsizei
     ) -> (),
+    fn glGenerateMipmap(target: GLenum) -> (),
     fn glDrawBuffers(n: GLsizei, bufs: *const GLenum) -> (),
     fn glVertexAttribDivisor(index: GLuint, divisor: GLuint) -> (),
     fn glBufferSubData(
