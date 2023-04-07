@@ -208,6 +208,19 @@ pub fn define_glk_view_dlg() -> *const Class {
     return decl.register();
 }
 
+pub fn define_glk_view_controller() -> *const Class {
+    let superclass = class!(GLKViewController);
+    let mut decl = ClassDecl::new("QuadViewController", superclass).unwrap();
+    extern "C" fn gesture(_: &Object, _: Sel) -> i32 {
+        1 << 2
+    }
+    unsafe {
+        decl.add_method(sel!(prefersHomeIndicatorAutoHidden), yes as extern "C" fn(&Object, Sel) -> BOOL);
+        decl.add_method(sel!(preferredScreenEdgesDeferringSystemGestures), gesture as extern "C" fn(&Object, Sel) -> i32);
+    }
+    return decl.register();
+}
+
 pub fn define_app_delegate() -> *const Class {
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
@@ -293,11 +306,12 @@ pub fn define_app_delegate() -> *const Class {
             let _: () = msg_send![glk_view_obj, setContentScaleFactor: screen_scale];
             let _: () = msg_send![window_obj, addSubview: glk_view_obj];
 
-            let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
+            // let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
+            let view_ctrl_obj: ObjcId = msg_send![define_glk_view_controller(), alloc];
             let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
 
             let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
-            let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:60];
+            let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:120];
             let _: () = msg_send![window_obj, setRootViewController: view_ctrl_obj];
 
             *VIEW_CTRL_OBJ.lock().unwrap() = view_ctrl_obj as _;
