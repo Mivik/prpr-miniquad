@@ -212,9 +212,10 @@ pub fn define_glk_view_controller() -> *const Class {
     let superclass = class!(GLKViewController);
     let mut decl = ClassDecl::new("QuadViewController", superclass).unwrap();
     extern "C" fn gesture(_: &Object, _: Sel) -> i32 {
-        1 << 2
+        15
     }
     unsafe {
+        decl.add_method(sel!(prefersStatusBarHidden), yes as extern "C" fn(&Object, Sel) -> BOOL);
         decl.add_method(sel!(prefersHomeIndicatorAutoHidden), yes as extern "C" fn(&Object, Sel) -> BOOL);
         decl.add_method(sel!(preferredScreenEdgesDeferringSystemGestures), gesture as extern "C" fn(&Object, Sel) -> i32);
     }
