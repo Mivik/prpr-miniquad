@@ -55,6 +55,7 @@ enum Message {
         touch_id: u64,
         x: f32,
         y: f32,
+        time: u64,
     },
     Character {
         character: u32,
@@ -269,6 +270,7 @@ impl MainThreadState {
                 touch_id,
                 x,
                 y,
+                time,
             } => {
                 self.event_handler.touch_event(
                     self.context.with_display(&mut self.display),
@@ -276,6 +278,7 @@ impl MainThreadState {
                     touch_id,
                     x,
                     y,
+                    time as f64 / 1000.,
                 );
             }
             Message::Character { character } => {
@@ -601,6 +604,7 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
     action: ndk_sys::jint,
     x: ndk_sys::jfloat,
     y: ndk_sys::jfloat,
+    time: ndk_sys::jlong,
 ) {
     let phase = match action {
         0 => TouchPhase::Moved,
@@ -615,6 +619,7 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
         touch_id: touch_id as _,
         x: x as f32,
         y: y as f32,
+        time: time as u64,
     });
 }
 

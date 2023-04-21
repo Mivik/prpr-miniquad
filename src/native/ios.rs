@@ -113,6 +113,7 @@ pub fn define_glk_view() -> *const Class {
                         ios_touch as _,
                         ios_pos.x as _,
                         ios_pos.y as _,
+                        msg_send![ios_touch, timestamp] as _,
                     );
                 }
             }

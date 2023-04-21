@@ -406,6 +406,7 @@ pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
             id as _,
             x as _,
             y as _,
+            0.,
         );
     });
 }
