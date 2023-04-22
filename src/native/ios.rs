@@ -107,13 +107,14 @@ pub fn define_glk_view() -> *const Class {
                 ios_pos.x *= payload.display.scale;
                 ios_pos.y *= payload.display.scale;
                 if let Some((context, event_handler)) = payload.context() {
+                    let timestamp: f64 = msg_send![ios_touch, timestamp];
                     event_handler.touch_event(
                         context,
                         phase,
                         ios_touch as _,
                         ios_pos.x as _,
                         ios_pos.y as _,
-                        msg_send![ios_touch, timestamp] as _,
+                        timestamp,
                     );
                 }
             }
