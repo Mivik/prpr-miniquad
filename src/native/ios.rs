@@ -21,11 +21,11 @@ use {
 };
 
 pub static VIEW_CTRL_OBJ: Mutex<usize> = Mutex::new(0);
+static PAUSE_RESUME_LISTENER: Mutex<Option<fn(bool)>> = Mutex::new(None);
 
 struct IosDisplay {
     data: NativeDisplayData,
     scale: f64,
-    pause_resume_listener: Option<fn(bool)>,
 }
 
 impl crate::native::NativeDisplay for IosDisplay {
@@ -62,7 +62,7 @@ impl crate::native::NativeDisplay for IosDisplay {
     }
 
     fn set_pause_resume_listener(&mut self, listener: fn(bool)) {
-        self.pause_resume_listener = Some(listener);
+        *PAUSE_RESUME_LISTENER.lock().unwrap() = Some(listener);
     }
 }
 
@@ -127,7 +127,6 @@ pub fn define_glk_view() -> *const Class {
     }
 
     extern "C" fn touches_began(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
-        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("WO QU!")) };
         process_event(this, touches, TouchPhase::Started);
     }
 
@@ -222,48 +221,7 @@ pub fn define_glk_view_controller() -> *const Class {
     extern "C" fn gesture(_: &Object, _: Sel) -> i32 {
         1 << 2
     }
-    extern "C" fn viewDidAppear(this: &Object, _: Sel, animated: BOOL) {
-        let _: () = unsafe {
-            msg_send![
-                super(this, class!(UIViewController)),
-                viewDidAppear: animated
-            ]
-        };
-        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear!!!")) };
-        let payload = get_window_payload(this);
-        if let Some(func) = payload.display.pause_resume_listener {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
-            func(false);
-        } else {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
-        }
-    }
-    extern "C" fn viewWillDisappear(this: &Object, _: Sel, animated: BOOL) {
-        let _: () = unsafe {
-            msg_send![
-                super(this, class!(UIViewController)),
-                viewWillDisappear: animated
-            ]
-        };
-        let _: () =
-            unsafe { frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear!!!")) };
-        let payload = get_window_payload(this);
-        if let Some(func) = payload.display.pause_resume_listener {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
-            func(true);
-        } else {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
-        }
-    }
     unsafe {
-        decl.add_method(
-            sel!(viewDidAppear:),
-            viewDidAppear as extern "C" fn(&Object, Sel, BOOL),
-        );
-        decl.add_method(
-            sel!(viewWillDisappear:),
-            viewWillDisappear as extern "C" fn(&Object, Sel, BOOL),
-        );
         decl.add_method(
             sel!(prefersHomeIndicatorAutoHidden),
             yes as extern "C" fn(&Object, Sel) -> BOOL,
@@ -274,7 +232,6 @@ pub fn define_glk_view_controller() -> *const Class {
         );
     }
 
-    decl.add_ivar::<*mut c_void>("display_ptr");
     return decl.register();
 }
 
@@ -324,7 +281,6 @@ pub fn define_app_delegate() -> *const Class {
                         ..Default::default()
                     },
                     scale: screen_scale,
-                    pause_resume_listener: None,
                 },
                 f: Some(Box::new(f)),
                 event_handler: None,
@@ -370,7 +326,7 @@ pub fn define_app_delegate() -> *const Class {
             (*view_ctrl_obj).set_ivar("display_ptr", payload_ptr);
 
             let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
-            let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:120];
+            let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond: 120];
             let _: () = msg_send![window_obj, setRootViewController: view_ctrl_obj];
 
             *VIEW_CTRL_OBJ.lock().unwrap() = view_ctrl_obj as _;
@@ -380,11 +336,41 @@ pub fn define_app_delegate() -> *const Class {
         YES
     }
 
+    extern "C" fn applicationWillResignActive(this: &Object, _: Sel, _: ObjcId) {
+        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear")) };
+        if let Some(func) = PAUSE_RESUME_LISTENER.lock().unwrap() {
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
+            func(true);
+        } else {
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
+        }
+    }
+
+    extern "C" fn applicationDidBecomeActive(this: &Object, _: Sel, _: ObjcId) {
+        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear")) };
+        if let Some(func) = PAUSE_RESUME_LISTENER.lock().unwrap() {
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
+            func(false);
+        } else {
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
+        }
+    }
+
     unsafe {
         decl.add_method(
             sel!(application: didFinishLaunchingWithOptions:),
             did_finish_launching_with_options
                 as extern "C" fn(&Object, Sel, ObjcId, ObjcId) -> BOOL,
+        );
+        decl.add_method(
+            sel!(applicationWillResignActive:),
+            applicationWillResignActive
+                as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+        );
+        decl.add_method(
+            sel!(applicationDidBecomeActive:),
+            applicationDidBecomeActive
+                as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
         );
     }
 
