@@ -127,6 +127,7 @@ pub fn define_glk_view() -> *const Class {
     }
 
     extern "C" fn touches_began(this: &Object, _: Sel, touches: ObjcId, _: ObjcId) {
+        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("WO QU!")) };
         process_event(this, touches, TouchPhase::Started);
     }
 
@@ -224,7 +225,7 @@ pub fn define_glk_view_controller() -> *const Class {
     extern "C" fn viewDidAppear(this: &Object, _: Sel, animated: BOOL) {
         let _: () = unsafe {
             msg_send![
-                super(this, class!(GLKViewController)),
+                super(this, class!(UIViewController)),
                 viewDidAppear: animated
             ]
         };
@@ -240,7 +241,7 @@ pub fn define_glk_view_controller() -> *const Class {
     extern "C" fn viewWillDisappear(this: &Object, _: Sel, animated: BOOL) {
         let _: () = unsafe {
             msg_send![
-                super(this, class!(GLKViewController)),
+                super(this, class!(UIViewController)),
                 viewWillDisappear: animated
             ]
         };
