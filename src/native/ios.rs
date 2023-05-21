@@ -247,11 +247,11 @@ pub fn define_glk_view_controller() -> *const Class {
     }
     unsafe {
         decl.add_method(
-            sel!(viewDidAppear),
+            sel!(viewDidAppear:),
             viewDidAppear as extern "C" fn(&Object, Sel, BOOL),
         );
         decl.add_method(
-            sel!(viewWillDisappear),
+            sel!(viewWillDisappear:),
             viewWillDisappear as extern "C" fn(&Object, Sel, BOOL),
         );
         decl.add_method(
