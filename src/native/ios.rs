@@ -221,20 +221,34 @@ pub fn define_glk_view_controller() -> *const Class {
     extern "C" fn gesture(_: &Object, _: Sel) -> i32 {
         1 << 2
     }
-    extern "C" fn viewDidAppear(obj: &Object, _: Sel, animated: BOOL) {
+    extern "C" fn viewDidAppear(this: &Object, _: Sel, animated: BOOL) {
         let _: () = msg_send![
-            super(obj, class!(GLKViewController)),
+            super(this, class!(GLKViewController)),
             viewDidAppear: animated
         ];
         let payload = get_window_payload(this);
-        if let Some(func) = payload {
+        if let Some(func) = payload.pause_resume_listener {
             func(false);
+        }
+    }
+    extern "C" fn viewWillDisappear(this: &Object, _: Sel, animated: BOOL) {
+        let _: () = msg_send![
+            super(this, class!(GLKViewController)),
+            viewWillDisappear: animated
+        ];
+        let payload = get_window_payload(this);
+        if let Some(func) = payload.pause_resume_listener {
+            func(true);
         }
     }
     unsafe {
         decl.add_method(
             sel!(viewDidAppear),
             viewDidAppear as extern "C" fn(&Object, Sel, BOOL),
+        );
+        decl.add_method(
+            sel!(viewWillDisappear),
+            viewWillDisappear as extern "C" fn(&Object, Sel, BOOL),
         );
         decl.add_method(
             sel!(prefersHomeIndicatorAutoHidden),
@@ -296,6 +310,7 @@ pub fn define_app_delegate() -> *const Class {
                         ..Default::default()
                     },
                     scale: screen_scale,
+                    pause_resume_listener: None,
                 },
                 f: Some(Box::new(f)),
                 event_handler: None,
