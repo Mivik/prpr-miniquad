@@ -338,7 +338,7 @@ pub fn define_app_delegate() -> *const Class {
 
     extern "C" fn applicationWillResignActive(this: &Object, _: Sel, _: ObjcId) {
         let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear")) };
-        if let Some(func) = PAUSE_RESUME_LISTENER.lock().unwrap() {
+        if let Some(func) = *PAUSE_RESUME_LISTENER.lock().unwrap() {
             let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(true);
         } else {
@@ -348,7 +348,7 @@ pub fn define_app_delegate() -> *const Class {
 
     extern "C" fn applicationDidBecomeActive(this: &Object, _: Sel, _: ObjcId) {
         let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear")) };
-        if let Some(func) = PAUSE_RESUME_LISTENER.lock().unwrap() {
+        if let Some(func) = *PAUSE_RESUME_LISTENER.lock().unwrap() {
             let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(false);
         } else {
