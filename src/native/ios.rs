@@ -228,13 +228,13 @@ pub fn define_glk_view_controller() -> *const Class {
                 viewDidAppear: animated
             ]
         };
-        let _: () = frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear!!!"));
+        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear!!!")) };
         let payload = get_window_payload(this);
         if let Some(func) = payload.display.pause_resume_listener {
-            let _: () = frameworks::NSLog(apple_util::str_to_nsstring("sent"));
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(false);
         } else {
-            let _: () = frameworks::NSLog(apple_util::str_to_nsstring("sad"));
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
         }
     }
     extern "C" fn viewWillDisappear(this: &Object, _: Sel, animated: BOOL) {
@@ -244,13 +244,14 @@ pub fn define_glk_view_controller() -> *const Class {
                 viewWillDisappear: animated
             ]
         };
-        let _: () = frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear!!!"));
+        let _: () =
+            unsafe { frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear!!!")) };
         let payload = get_window_payload(this);
         if let Some(func) = payload.display.pause_resume_listener {
-            let _: () = frameworks::NSLog(apple_util::str_to_nsstring("sent"));
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(true);
         } else {
-            let _: () = frameworks::NSLog(apple_util::str_to_nsstring("sad"));
+            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
         }
     }
     unsafe {
