@@ -25,6 +25,7 @@ pub static VIEW_CTRL_OBJ: Mutex<usize> = Mutex::new(0);
 struct IosDisplay {
     data: NativeDisplayData,
     scale: f64,
+    pause_resume_listener: Option<fn(bool)>,
 }
 
 impl crate::native::NativeDisplay for IosDisplay {
@@ -58,6 +59,10 @@ impl crate::native::NativeDisplay for IosDisplay {
     fn clipboard_set(&mut self, _data: &str) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn set_pause_resume_listener(&mut self, listener: fn(bool)) {
+        self.pause_resume_listener = Some(listener);
     }
 }
 
@@ -216,10 +221,32 @@ pub fn define_glk_view_controller() -> *const Class {
     extern "C" fn gesture(_: &Object, _: Sel) -> i32 {
         1 << 2
     }
-    unsafe {
-        decl.add_method(sel!(prefersHomeIndicatorAutoHidden), yes as extern "C" fn(&Object, Sel) -> BOOL);
-        decl.add_method(sel!(preferredScreenEdgesDeferringSystemGestures), gesture as extern "C" fn(&Object, Sel) -> i32);
+    extern "C" fn viewDidAppear(obj: &Object, _: Sel, animated: BOOL) {
+        let _: () = msg_send![
+            super(obj, class!(GLKViewController)),
+            viewDidAppear: animated
+        ];
+        let payload = get_window_payload(this);
+        if let Some(func) = payload {
+            func(false);
+        }
     }
+    unsafe {
+        decl.add_method(
+            sel!(viewDidAppear),
+            viewDidAppear as extern "C" fn(&Object, Sel, BOOL),
+        );
+        decl.add_method(
+            sel!(prefersHomeIndicatorAutoHidden),
+            yes as extern "C" fn(&Object, Sel) -> BOOL,
+        );
+        decl.add_method(
+            sel!(preferredScreenEdgesDeferringSystemGestures),
+            gesture as extern "C" fn(&Object, Sel) -> i32,
+        );
+    }
+
+    decl.add_ivar::<*mut c_void>("display_ptr");
     return decl.register();
 }
 
@@ -311,6 +338,7 @@ pub fn define_app_delegate() -> *const Class {
             // let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
             let view_ctrl_obj: ObjcId = msg_send![define_glk_view_controller(), alloc];
             let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
+            (*view_ctrl_obj).set_ivar("display_ptr", payload_ptr);
 
             let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
             let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:120];

@@ -50,6 +50,9 @@ pub trait NativeDisplay: std::any::Any {
     }
     fn show_keyboard(&mut self, _show: bool) {}
 
+    fn set_pause_resume_listener(&mut self, _listener: fn(bool)) {
+    }
+
     fn as_any(&mut self) -> &mut dyn std::any::Any;
 }
 
