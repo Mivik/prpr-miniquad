@@ -323,7 +323,6 @@ pub fn define_app_delegate() -> *const Class {
             // let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
             let view_ctrl_obj: ObjcId = msg_send![define_glk_view_controller(), alloc];
             let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
-            (*view_ctrl_obj).set_ivar("display_ptr", payload_ptr);
 
             let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
             let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond: 120];
