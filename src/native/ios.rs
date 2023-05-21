@@ -227,7 +227,7 @@ pub fn define_glk_view_controller() -> *const Class {
             viewDidAppear: animated
         ];
         let payload = get_window_payload(this);
-        if let Some(func) = payload.pause_resume_listener {
+        if let Some(func) = payload.display.pause_resume_listener {
             func(false);
         }
     }
@@ -237,7 +237,7 @@ pub fn define_glk_view_controller() -> *const Class {
             viewWillDisappear: animated
         ];
         let payload = get_window_payload(this);
-        if let Some(func) = payload.pause_resume_listener {
+        if let Some(func) = payload.display.pause_resume_listener {
             func(true);
         }
     }
