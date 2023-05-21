@@ -365,12 +365,12 @@ pub fn define_app_delegate() -> *const Class {
         decl.add_method(
             sel!(applicationWillResignActive:),
             applicationWillResignActive
-                as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+                as extern "C" fn(&Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(applicationDidBecomeActive:),
             applicationDidBecomeActive
-                as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+                as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
 
