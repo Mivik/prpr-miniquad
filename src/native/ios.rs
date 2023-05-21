@@ -336,22 +336,14 @@ pub fn define_app_delegate() -> *const Class {
     }
 
     extern "C" fn applicationWillResignActive(this: &Object, _: Sel, _: ObjcId) {
-        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("boom!!! disappear")) };
         if let Some(func) = *PAUSE_RESUME_LISTENER.lock().unwrap() {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(true);
-        } else {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
         }
     }
 
     extern "C" fn applicationDidBecomeActive(this: &Object, _: Sel, _: ObjcId) {
-        let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("yeah!!! appear")) };
         if let Some(func) = *PAUSE_RESUME_LISTENER.lock().unwrap() {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sent")) };
             func(false);
-        } else {
-            let _: () = unsafe { frameworks::NSLog(apple_util::str_to_nsstring("sad")) };
         }
     }
 
@@ -363,13 +355,11 @@ pub fn define_app_delegate() -> *const Class {
         );
         decl.add_method(
             sel!(applicationWillResignActive:),
-            applicationWillResignActive
-                as extern "C" fn(&Object, Sel, ObjcId),
+            applicationWillResignActive as extern "C" fn(&Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(applicationDidBecomeActive:),
-            applicationDidBecomeActive
-                as extern "C" fn(&Object, Sel, ObjcId),
+            applicationDidBecomeActive as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
 
