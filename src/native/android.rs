@@ -135,7 +135,26 @@ impl NativeDisplay for AndroidDisplay {
     fn clipboard_get(&mut self) -> Option<String> {
         None
     }
-    fn clipboard_set(&mut self, _data: &str) {}
+    fn clipboard_set(&mut self, data: &str) {
+        unsafe {
+            let env = crate::native::attach_jni_env();
+            let ctx = ndk_context::android_context().context();
+            let class = (**env).GetObjectClass.unwrap()(env, ctx);
+            let method = (**env).GetMethodID.unwrap()(
+                env,
+                class,
+                b"copy\0".as_ptr() as _,
+                b"(Ljava/lang/String;)V\0".as_ptr() as _,
+            );
+            let data = std::ffi::CString::new(data.to_owned()).unwrap();
+            (**env).CallVoidMethod.unwrap()(
+                env,
+                ctx,
+                method,
+                (**env).NewStringUTF.unwrap()(env, data.as_ptr()),
+            );
+        }
+    }
     fn show_keyboard(&mut self, show: bool) {
         unsafe {
             let env = attach_jni_env();
