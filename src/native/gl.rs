@@ -41,6 +41,7 @@ pub const GL_VERTEX_SHADER: u32 = 0x8B31;
 pub const GL_INCR: u32 = 0x1E02;
 pub const GL_DYNAMIC_DRAW: u32 = 0x88E8;
 pub const GL_STATIC_DRAW: u32 = 0x88E4;
+pub const GL_PIXEL_PACK_BUFFER: u32 = 0x88EB;
 pub const GL_TEXTURE_CUBE_MAP_POSITIVE_Z: u32 = 0x8519;
 pub const GL_TEXTURE_CUBE_MAP: u32 = 0x8513;
 pub const GL_FUNC_SUBTRACT: u32 = 0x800A;
@@ -68,6 +69,7 @@ pub const GL_NEAREST_MIPMAP_NEAREST: u32 = 0x2700;
 pub const GL_UNSIGNED_SHORT_4_4_4_4: u32 = 0x8033;
 pub const GL_SRC_ALPHA_SATURATE: u32 = 0x0308;
 pub const GL_STREAM_DRAW: u32 = 0x88E0;
+pub const GL_STREAM_READ: u32 = 0x88E1;
 pub const GL_ONE: u32 = 1;
 pub const GL_NEAREST_MIPMAP_LINEAR: u32 = 0x2702;
 pub const GL_RGB10_A2: u32 = 0x8059;
@@ -625,7 +627,9 @@ gl_loader!(
     fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
     fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> (),
     fn glFlush() -> (),
-    fn glFinish() -> ()
+    fn glFinish() -> (),
+    fn glMapBuffer(target: GLenum, access: GLenum) -> *const GLubyte,
+    fn glUnmapBuffer(target: GLenum) -> ()
 );
 
 // note that glGetString only works after first glSwapBuffer,
