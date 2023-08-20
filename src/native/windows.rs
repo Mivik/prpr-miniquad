@@ -586,6 +586,7 @@ unsafe fn create_window(
     resizable: bool,
     width: i32,
     height: i32,
+    headless: bool,
 ) -> (HWND, HDC) {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
@@ -650,7 +651,9 @@ unsafe fn create_window(
         NULL as _,                   // lparam
     );
     assert!(hwnd.is_null() == false);
-    ShowWindow(hwnd, SW_SHOW);
+    if !headless {
+        ShowWindow(hwnd, SW_SHOW);
+    }
     let dc = GetDC(hwnd);
     assert!(dc.is_null() == false);
 
@@ -830,6 +833,7 @@ where
             conf.window_resizable,
             conf.window_width as _,
             conf.window_height as _,
+            conf.headless,
         );
         if let Some(icon) = &conf.icon {
             set_icon(wnd, icon);

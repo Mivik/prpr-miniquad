@@ -142,6 +142,8 @@ pub struct Conf {
     /// Platform specific settings. Hints to OS for context creation, driver-specific
     /// settings etc.
     pub platform: Platform,
+
+    pub headless: bool,
 }
 
 /// Icon image in three levels of detail.
@@ -186,6 +188,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            headless: false,
         }
     }
 }

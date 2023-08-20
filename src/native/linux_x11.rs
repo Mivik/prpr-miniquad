@@ -706,7 +706,9 @@ where
     );
     gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
-    display.show_window(window);
+    if !conf.headless {
+        display.show_window(window);
+    }
 
     if conf.fullscreen {
         display.set_fullscreen(window, true);
@@ -797,7 +799,9 @@ where
             .expect("non-null function pointer")(name.as_ptr() as _)
     });
 
-    display.show_window(window);
+    if !conf.headless {
+        display.show_window(window);
+    }
 
     if conf.fullscreen {
         display.set_fullscreen(window, true);
