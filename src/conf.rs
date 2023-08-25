@@ -206,6 +206,7 @@ impl Default for Conf {
             window_resizable: false,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            headless: false,
         }
     }
 }
