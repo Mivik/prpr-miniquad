@@ -227,6 +227,9 @@ pub struct Conf {
 
     /// Platform-specific hints (e.g., context creation, driver settings).
     pub platform: Platform,
+
+    /// If `true`, the application will run in headless mode.
+    pub headless: bool,
 }
 
 /// Icon image in three levels of detail.
@@ -271,6 +274,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            headless: false,
         }
     }
 }
@@ -288,6 +292,7 @@ impl Default for Conf {
             window_resizable: false, //
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            headless: false,
         }
     }
 }
