@@ -568,6 +568,11 @@ impl Default for PassAction {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderPass(usize);
+impl RenderPass {
+    pub fn gl_internal_id(&self) -> GLuint {
+        self.0 as GLuint
+    }
+}
 
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
 pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
