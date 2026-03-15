@@ -260,6 +260,14 @@ static mut OHOS_ENV: Option<Env> = None;
 #[napi(module_exports)] //ignore this error ,this is a napi bug.
 pub fn init(exports: Object, env: Env) -> Result<()> {
     unsafe {
+        let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
+        libc::CPU_ZERO(&mut cpuset);
+        let num_cpus = libc::sysconf(libc::_SC_NPROCESSORS_ONLN) as usize;
+        let start_cpu = num_cpus.saturating_sub(4);
+        for cpu in start_cpu..num_cpus {
+            libc::CPU_SET(cpu, &mut cpuset);
+        }
+        libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpuset);
         let _handle = forward_stdio_to_hilog();
         OHOS_EXPORTS = Some(std::mem::transmute(exports));
         OHOS_ENV = Some(env);
