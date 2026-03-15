@@ -23,6 +23,8 @@ mod default_icon;
 pub use native::{gl, NativeDisplay};
 
 pub use graphics::GraphicsContext as Context;
+#[cfg(target_env = "ohos")]
+use ohos_hilog_binding::forward_stdio_to_hilog;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
@@ -258,6 +260,7 @@ static mut OHOS_ENV: Option<Env> = None;
 #[napi(module_exports)] //ignore this error ,this is a napi bug.
 pub fn init(exports: Object, env: Env) -> Result<()> {
     unsafe {
+        let _handle = forward_stdio_to_hilog();
         OHOS_EXPORTS = Some(std::mem::transmute(exports));
         OHOS_ENV = Some(env);
         quad_main();
