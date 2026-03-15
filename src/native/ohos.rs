@@ -597,7 +597,16 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
 
 fn load_file_sync(path: &str) -> crate::fs::Response {
     let full_path = format!("/data/storage/el1/bundle/entry/resources/resfile/{}", path);
-    std::fs::read(&full_path).map_err(Into::into)
+    match std::fs::read(&full_path) {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            hilog_error!(format!(
+                "load_file_sync: failed to load file: {} - error: {:?}",
+                full_path, e
+            ));
+            Err(e.into())
+        }
+    }
 }
 
 #[napi]
