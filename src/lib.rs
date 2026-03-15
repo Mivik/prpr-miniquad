@@ -11,6 +11,9 @@ use napi_derive_ohos::napi;
 #[cfg(target_env = "ohos")]
 use napi_ohos::{bindgen_prelude::Object, Env, Result};
 
+#[cfg(target_env = "ohos")]
+use ohos_hilog_binding::forward_stdio_to_hilog;
+
 #[cfg(feature = "log-impl")]
 pub mod log;
 
@@ -23,8 +26,6 @@ mod default_icon;
 pub use native::{gl, NativeDisplay};
 
 pub use graphics::GraphicsContext as Context;
-#[cfg(target_env = "ohos")]
-use ohos_hilog_binding::forward_stdio_to_hilog;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
@@ -259,6 +260,7 @@ static mut OHOS_ENV: Option<Env> = None;
 #[cfg(target_env = "ohos")]
 #[napi(module_exports)] //ignore this error ,this is a napi bug.
 pub fn init(exports: Object, env: Env) -> Result<()> {
+    let _handle = forward_stdio_to_hilog();
     unsafe {
         let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
         libc::CPU_ZERO(&mut cpuset);
@@ -268,7 +270,6 @@ pub fn init(exports: Object, env: Env) -> Result<()> {
             libc::CPU_SET(cpu, &mut cpuset);
         }
         libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpuset);
-        let _handle = forward_stdio_to_hilog();
         OHOS_EXPORTS = Some(std::mem::transmute(exports));
         OHOS_ENV = Some(env);
         quad_main();
