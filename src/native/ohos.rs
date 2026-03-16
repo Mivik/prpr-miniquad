@@ -5,6 +5,7 @@ use crate::{
     GraphicsContext,
 };
 use ohos_hilog_binding::{hilog_error, hilog_fatal, hilog_info};
+use ohos_init_binding::canIUse;
 use ohos_input_sys::input_manager::*;
 use ohos_native_buffer_sys::OH_NativeBuffer_Usage_NATIVEBUFFER_USAGE_CPU_READ;
 use ohos_native_window_sys::{
@@ -27,7 +28,14 @@ use napi_ohos::{
     bindgen_prelude::*,
     threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
 };
-use std::{cell::RefCell, sync::mpsc, sync::OnceLock, thread};
+use std::{
+    cell::RefCell,
+    sync::atomic::{AtomicBool, Ordering},
+    sync::mpsc,
+    sync::OnceLock,
+    thread,
+};
+static IS_2IN1_DEVICE: AtomicBool = AtomicBool::new(false);
 static REQUEST_CALLBACK: OnceLock<
     ThreadsafeFunction<String, (), String, napi_ohos::Status, false, false, 1>,
 > = OnceLock::new();
@@ -333,6 +341,7 @@ where
     let xcomponent = XComponent::init(*env, *exports).expect("Failed to initialize XComponent");
     let _ = register_xcomponent_callbacks(&xcomponent);
     set_display_sync(&xcomponent);
+    save_2in1_device();
     struct SendHack<F>(F);
     unsafe impl<F> Send for SendHack<F> {}
     let f = SendHack(f);
@@ -579,12 +588,29 @@ unsafe extern "C" fn touch_event_callback(touch_event: *const Input_TouchEvent) 
 }
 
 unsafe extern "C" fn mouse_event_callback(mouse_event: *const Input_MouseEvent) {
+    // in fact we disable mouse support for normal devices
+    // according to Huawei AGC, we must send the mouse event when the device is '2in1'
+    if !IS_2IN1_DEVICE.load(Ordering::Relaxed) {
+        return;
+    }
     if !mouse_event.is_null() {
-        unsafe {
-            let _action = OH_Input_GetMouseEventAction(mouse_event);
-            let _x = OH_Input_GetMouseEventDisplayX(mouse_event);
-            let _y = OH_Input_GetMouseEventDisplayY(mouse_event);
-        }
+        let action = Input_MouseEventAction(OH_Input_GetMouseEventAction(mouse_event) as u32);
+        let x = OH_Input_GetMouseEventDisplayX(mouse_event);
+        let y = OH_Input_GetMouseEventDisplayY(mouse_event);
+        let action_time = OH_Input_GetMouseEventActionTime(mouse_event);
+        let phase = match action {
+            Input_MouseEventAction::MOUSE_ACTION_BUTTON_DOWN => TouchPhase::Started,
+            Input_MouseEventAction::MOUSE_ACTION_MOVE => TouchPhase::Moved,
+            Input_MouseEventAction::MOUSE_ACTION_BUTTON_UP => TouchPhase::Ended,
+            _ => TouchPhase::Cancelled,
+        };
+        send_message(Message::Touch {
+            phase,
+            touch_id: 0,
+            x: x as f32,
+            y: y as f32,
+            time: (action_time / 1000) as u64,
+        });
     }
 }
 
@@ -626,4 +652,11 @@ pub fn call_request_callback(value: String) {
     } else {
         hilog_error!("REQUEST_CALLBACK not initialized");
     }
+}
+
+pub fn save_2in1_device() {
+    // ref:https://developer.huawei.com/consumer/cn/doc/harmonyos-references/js-apis-huksexternalcrypto
+    // this Capability only shows true in 2in1 device.
+    let is_2in1 = canIUse("SystemCapability.Security.Huks.CryptoExtension");
+    IS_2IN1_DEVICE.store(is_2in1, Ordering::Relaxed);
 }
