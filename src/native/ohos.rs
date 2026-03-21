@@ -36,6 +36,7 @@ use std::{
     thread,
 };
 static IS_2IN1_DEVICE: AtomicBool = AtomicBool::new(false);
+static INTERCEPTOR_REGISTERED: AtomicBool = AtomicBool::new(false);
 static REQUEST_CALLBACK: OnceLock<
     ThreadsafeFunction<String, (), String, napi_ohos::Status, false, false, 1>,
 > = OnceLock::new();
@@ -512,37 +513,45 @@ where
         send_message(Message::SurfaceDestroyed);
         Ok(())
     });
-    if !set_interceptor_state(true) {
-        hilog_info!("falling back to touch event.");
-        xcomponent.on_touch_event(|_xcomponent, _win, data| {
-            for i in 0..data.num_points {
-                let touch_point = &data.touch_points[i as usize];
-                let phase = match touch_point.event_type {
-                    ohos_xcomponent_binding::TouchEvent::Down => TouchPhase::Started,
-                    ohos_xcomponent_binding::TouchEvent::Up => TouchPhase::Ended,
-                    ohos_xcomponent_binding::TouchEvent::Move => TouchPhase::Moved,
-                    ohos_xcomponent_binding::TouchEvent::Cancel => TouchPhase::Cancelled,
-                    _ => TouchPhase::Cancelled, // Default to cancelled for unknown events
-                };
-                send_message(Message::Touch {
-                    phase,
-                    touch_id: touch_point.id as u64,
-                    x: touch_point.x,
-                    y: touch_point.y,
-                    time: (touch_point.timestamp / 1_000_000) as u64,
-                });
-            }
-            Ok(())
-        });
-    }
+    xcomponent.on_touch_event(|_xcomponent, _win, data| {
+        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        for i in 0..data.num_points {
+            let touch_point = &data.touch_points[i as usize];
+            let phase = match touch_point.event_type {
+                ohos_xcomponent_binding::TouchEvent::Down => TouchPhase::Started,
+                ohos_xcomponent_binding::TouchEvent::Up => TouchPhase::Ended,
+                ohos_xcomponent_binding::TouchEvent::Move => TouchPhase::Moved,
+                ohos_xcomponent_binding::TouchEvent::Cancel => TouchPhase::Cancelled,
+                _ => TouchPhase::Cancelled, // Default to cancelled for unknown events
+            };
+            send_message(Message::Touch {
+                phase,
+                touch_id: touch_point.id as u64,
+                x: touch_point.x,
+                y: touch_point.y,
+                time: (touch_point.timestamp / 1_000_000) as u64,
+            });
+        }
+        Ok(())
+    });
+    //if !set_interceptor_state(true) {
+    //    hilog_info!("Interceptor registration failed, using on_touch_event fallback.");
+    //}
 
     let _ = xcomponent.register_callback();
     let _ = xcomponent.on_frame_callback(|_, _, _| Ok(()));
 }
 
 #[napi]
-fn set_interceptor_state(state: bool) -> bool {
+pub fn set_interceptor_state(state: bool) -> bool {
     if state {
+        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+            hilog_info!("Interceptor already registered");
+            call_request_callback(r#"{"action":"interceptor_state","state":true}"#.to_string());
+            return true;
+        }
         let callback = Box::new(Input_InterceptorEventCallback {
             mouseCallback: Some(mouse_event_callback),
             touchCallback: Some(touch_event_callback),
@@ -552,13 +561,22 @@ fn set_interceptor_state(state: bool) -> bool {
             let ret = OH_Input_AddInputEventInterceptor(Box::leak(callback), std::ptr::null_mut());
             if ret.is_err() {
                 hilog_info!("add input Event Interceptor failed , ret: {:?}", ret);
+                call_request_callback(r#"{"action":"interceptor_state","state":false}"#.to_string());
                 return false;
             }
         }
+        INTERCEPTOR_REGISTERED.store(true, Ordering::Relaxed);
+        hilog_info!("Interceptor registered successfully");
+        call_request_callback(r#"{"action":"interceptor_state","state":true}"#.to_string());
     } else {
-        unsafe {
-            let _ = OH_Input_RemoveInputEventInterceptor();
+        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+            unsafe {
+                let _ = OH_Input_RemoveInputEventInterceptor();
+            }
+            INTERCEPTOR_REGISTERED.store(false, Ordering::Relaxed);
+            hilog_info!("Interceptor removed, falling back to on_touch_event");
         }
+        call_request_callback(r#"{"action":"interceptor_state","state":false}"#.to_string());
     }
     return true;
 }
