@@ -561,7 +561,9 @@ pub fn set_interceptor_state(state: bool) -> bool {
             let ret = OH_Input_AddInputEventInterceptor(Box::leak(callback), std::ptr::null_mut());
             if ret.is_err() {
                 hilog_info!("add input Event Interceptor failed , ret: {:?}", ret);
-                call_request_callback(r#"{"action":"interceptor_state","state":false}"#.to_string());
+                call_request_callback(
+                    r#"{"action":"interceptor_state","state":false}"#.to_string(),
+                );
                 return false;
             }
         }
