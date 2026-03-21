@@ -30,7 +30,7 @@ use napi_ohos::{
 };
 use std::{
     cell::RefCell,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     sync::mpsc,
     sync::OnceLock,
     thread,
