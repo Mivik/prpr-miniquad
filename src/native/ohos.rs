@@ -35,8 +35,9 @@ use std::{
     sync::OnceLock,
     thread,
 };
+
 static IS_2IN1_DEVICE: AtomicBool = AtomicBool::new(false);
-static INTERCEPTOR_REGISTERED: AtomicBool = AtomicBool::new(false);
+static INTERCEPTOR: AtomicUsize = AtomicUsize::new(0);
 static REQUEST_CALLBACK: OnceLock<
     ThreadsafeFunction<String, (), String, napi_ohos::Status, false, false, 1>,
 > = OnceLock::new();
@@ -514,7 +515,7 @@ where
         Ok(())
     });
     xcomponent.on_touch_event(|_xcomponent, _win, data| {
-        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+        if INTERCEPTOR.load(Ordering::Acquire) != 0 {
             return Ok(());
         }
         for i in 0..data.num_points {
@@ -547,7 +548,7 @@ where
 #[napi]
 pub fn set_interceptor_state(state: bool) -> bool {
     if state {
-        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+        if INTERCEPTOR.load(Ordering::Acquire) != 0 {
             hilog_info!("Interceptor already registered");
             call_request_callback(r#"{"action":"interceptor_state","state":true}"#.to_string());
             return true;
@@ -557,8 +558,9 @@ pub fn set_interceptor_state(state: bool) -> bool {
             touchCallback: Some(touch_event_callback),
             axisCallback: Some(axis_event_callback),
         });
+        let callback = Box::into_raw(callback);
         unsafe {
-            let ret = OH_Input_AddInputEventInterceptor(Box::leak(callback), std::ptr::null_mut());
+            let ret = OH_Input_AddInputEventInterceptor(callback, std::ptr::null_mut());
             if ret.is_err() {
                 hilog_info!("add input Event Interceptor failed , ret: {:?}", ret);
                 call_request_callback(
@@ -567,15 +569,18 @@ pub fn set_interceptor_state(state: bool) -> bool {
                 return false;
             }
         }
-        INTERCEPTOR_REGISTERED.store(true, Ordering::Relaxed);
+        INTERCEPTOR.store(callback as usize, Ordering::Release);
         hilog_info!("Interceptor registered successfully");
         call_request_callback(r#"{"action":"interceptor_state","state":true}"#.to_string());
     } else {
-        if INTERCEPTOR_REGISTERED.load(Ordering::Relaxed) {
+        let prev = INTERCEPTOR.swap(0, Ordering::AcqRel);
+        if prev != 0 {
             unsafe {
                 let _ = OH_Input_RemoveInputEventInterceptor();
             }
-            INTERCEPTOR_REGISTERED.store(false, Ordering::Relaxed);
+            unsafe {
+                Box::from_raw(prev as *mut Input_InterceptorEventCallback);
+            }
             hilog_info!("Interceptor removed, falling back to on_touch_event");
         }
         call_request_callback(r#"{"action":"interceptor_state","state":false}"#.to_string());
@@ -585,6 +590,9 @@ pub fn set_interceptor_state(state: bool) -> bool {
 
 #[no_mangle]
 unsafe extern "C" fn touch_event_callback(touch_event: *const Input_TouchEvent) {
+    if INTERCEPTOR.load(Ordering::Acquire) == 0 {
+        return;
+    }
     if !touch_event.is_null() {
         let action = OH_Input_GetTouchEventAction(touch_event);
         let x = OH_Input_GetTouchEventDisplayX(touch_event);
@@ -608,6 +616,9 @@ unsafe extern "C" fn touch_event_callback(touch_event: *const Input_TouchEvent) 
 }
 
 unsafe extern "C" fn mouse_event_callback(mouse_event: *const Input_MouseEvent) {
+    if INTERCEPTOR.load(Ordering::Acquire) == 0 {
+        return;
+    }
     // in fact we disable mouse support for normal devices
     // according to Huawei AGC, we must send the mouse event when the device is '2in1'
     if !IS_2IN1_DEVICE.load(Ordering::Relaxed) {
