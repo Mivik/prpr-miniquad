@@ -54,7 +54,7 @@ quad-rand = "0.1"
 jni = "0.21.1"
 
 [target.'cfg(target_env = "ohos")'.dependencies]
-ohos-xcomponent-binding = "0.1"
+ohos-xcomponent-binding = "0.3"
 raw-window-handle = "0.6"
 napi-ohos = { version = "1.1.3", default-features = false, features = [
     "napi8",
@@ -66,15 +66,17 @@ ohos-hilog-binding = { version = "0.1.2", features = [
 ] }
 xcomponent-sys = { version = "0.3.4", features = ["api-14", "keyboard-types"] }
 keyboard-types = "0.8.3"
-ohos-xcomponent-sys = { version = "0.0.2" }
+ohos-xcomponent-sys = { version = "0.1.0" }
 ohos_enum_macro = { version = "0.0.2" }
 ohos-ime-binding = { version = "0.1.0" }
 ohos-input-sys = { version = "0.3.2", features = ["api-17"] }
 ohos-sys-opaque-types = { version = "0.1.7" }
-ohos-qos-sys = { version = "0.0.1", features = ["api-20"] }
 ohos-native-window-sys = { version = "0.0.1" }
 ohos-native-buffer-sys = { version = "0.0.1" }
 ohos-init-binding = { version = "0.0.3" }
+ohos-qos-binding = { version = "0.1.0" }
+ohos-bundle-binding = { version = "0.1.0" }
+hms-opengtx-binding = { git = "https://github.com/ohos-rs/ohos-native-bindings" }
 
 [target.'cfg(target_env = "ohos")'.build-dependencies]
 napi-build-ohos = { version = "1.1.3" }
